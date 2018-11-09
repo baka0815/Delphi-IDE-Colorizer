@@ -2,7 +2,7 @@
 //
 // Unit Vcl.Styles.Fixes
 // unit for the VCL Styles Utils
-// http://code.google.com/p/vcl-styles-utils/
+// https://github.com/RRUZ/vcl-styles-utils/
 //
 // The contents of this file are subject to the Mozilla Public License Version 1.1 (the "License");
 // you may not use this file except in compliance with the License. You may obtain a copy of the
@@ -37,9 +37,10 @@ uses
   Vcl.ExtCtrls,
   Vcl.Graphics;
 
-{$IF CompilerVersion = 23.0}
+{$IF CompilerVersion >= 23.0}
 type
   /// <summary> The <c>TButtonStyleHookFix</c> vcl style hook fix these QC #103708, #107764 for Delphi XE2
+  /// and the https://quality.embarcadero.com/browse/RSP-11619 issue present in X2-XE8
   /// </summary>
   /// <remarks>
   /// Use this hook in this way
@@ -98,11 +99,35 @@ type
   end;
 {$IFEND}
 
+{$IF CompilerVersion <= 26.0}
+  /// <summary> The <c>TComboBoxStyleHookFix</c> vcl style hook fix the QC #114632 for Delphi XE5 and earlier
+  /// </summary>
+  /// <remarks>
+  /// Use this hook in this way
+  /// <code>
+  /// TStyleManager.Engine.RegisterStyleHook(TComboBox, TComboBoxStyleHookFix);
+  /// </code>
+  /// </remarks>
+  TComboBoxStyleHookFix = class(TComboBoxStyleHook)
+  strict private
+    FTempItemIndex: Integer;
+    procedure WMCommand(var Message: TWMCommand); message WM_COMMAND;
+    procedure CNCommand(var Message: TWMCommand); message CN_COMMAND;
+  strict protected
+    procedure DrawItem(Canvas: TCanvas; Index: Integer;
+      const R: TRect; Selected: Boolean); override;
+  public
+    constructor Create(AControl: TWinControl); override;
+  end;
+{$IFEND}
+
 implementation
 
 uses
   Winapi.CommCtrl,
   Vcl.Themes,
+  Vcl.Forms,
+  System.SysUtils,
   System.Classes,
   System.UITypes,
   System.Types;
@@ -111,7 +136,7 @@ type
   TCustomButtonClass = class(TCustomButton);
   TWinControlClass = class(TWinControl);
 
-{$IF CompilerVersion = 23.0}
+{$IF CompilerVersion >= 23.0}
 
   // we need this helper to access some strict private fields
   TButtonStyleHookHelper = class Helper for TButtonStyleHook
@@ -133,7 +158,16 @@ type
   end;
 {$IFEND}
 
-{$IF CompilerVersion = 23.0}
+{$IF CompilerVersion <= 26.0}
+  TComboBoxStyleHookHelper = class helper for TComboBoxStyleHook
+  strict private
+    function _getDroppedDown: Boolean;
+  private
+    property _DroppedDown : Boolean read _getDroppedDown;
+  end;
+{$IFEND}
+
+{$IF CompilerVersion >= 23.0}
 
 procedure TButtonStyleHookFix.Paint(Canvas: TCanvas);
 const
@@ -154,55 +188,42 @@ var
   BufferLength: Integer;
   SaveIndex: Integer;
   X, Y, I: Integer;
+  IsDefault: Boolean;
   BCaption: String;
   LImageIndex: Integer;
 begin
-  // LImageIndex:=PBS_NORMAL;
+  LImageIndex:=PBS_NORMAL;
+  IsDefault := (Control is TCustomButton) and (TCustomButton(Control).Default);
 
   if StyleServices.Available then
   begin
     BCaption := Text;
+
+    if not Control.Enabled then
+    begin
+      LDetails := StyleServices.GetElementDetails(tbPushButtonDisabled);
+      LImageIndex := PBS_DISABLED;
+    end
+    else
     if Pressed then
     begin
       LDetails := StyleServices.GetElementDetails(tbPushButtonPressed);
       LImageIndex := PBS_PRESSED;
     end
-    else if MouseInControl then
+    else
+    if MouseInControl then
     begin
       LDetails := StyleServices.GetElementDetails(tbPushButtonHot);
       LImageIndex := PBS_HOT;
     end
-    else if Focused then
+    else
+    if Control.Focused or (IsDefault and (Screen.ActiveControl<>nil) and not (Screen.ActiveControl is TCustomButton) ) then
     begin
-      if not Control.Enabled then
-      begin
-        LDetails := StyleServices.GetElementDetails(tbPushButtonDisabled);
-        LImageIndex := PBS_DISABLED;
-      end
-      else
-      begin
-        // if MouseInControl then
-        begin
-          LDetails := StyleServices.GetElementDetails(tbPushButtonDefaulted);
-          LImageIndex := PBS_DEFAULTED;
-        end;
-        (* else
-          begin
-          LDetails := StyleServices.GetElementDetails(tbPushButtonNormal);
-          LImageIndex := PBS_NORMAL;
-          end; *)
-      end;
+      LDetails := StyleServices.GetElementDetails(tbPushButtonDefaulted);
+      LImageIndex := PBS_DEFAULTED;
     end
     else if Control.Enabled then
-    begin
       LDetails := StyleServices.GetElementDetails(tbPushButtonNormal);
-      LImageIndex := PBS_NORMAL;
-    end
-    else
-    begin
-      LDetails := StyleServices.GetElementDetails(tbPushButtonDisabled);
-      LImageIndex := PBS_DISABLED;
-    end;
 
     DrawRect := Control.ClientRect;
     StyleServices.DrawElement(Canvas.Handle, LDetails, DrawRect);
@@ -756,5 +777,50 @@ begin
 end;
 {$IFEND}
 
+{$IF CompilerVersion <= 26.0}
+constructor TComboBoxStyleHookFix.Create(AControl: TWinControl);
+begin
+  inherited;
+  FTempItemIndex := -1;
+end;
+
+procedure TComboBoxStyleHookFix.WMCommand(var Message: TWMCommand);
+begin
+  if (Message.NotifyCode = CBN_SELENDCANCEL) or (Message.NotifyCode = CBN_SELENDOK) or
+     (Message.NotifyCode = CBN_CLOSEUP) or (Message.NotifyCode = CBN_DROPDOWN) or
+     (Message.NotifyCode = CBN_SELCHANGE) then
+  begin
+    if (Message.NotifyCode = CBN_DROPDOWN) or (Message.NotifyCode = CBN_SELCHANGE) then
+      FTempItemIndex := TComboBox(Control).ItemIndex;
+  end;
+  inherited;
+end;
+
+procedure TComboBoxStyleHookFix.CNCommand(var Message: TWMCommand);
+begin
+  if (Message.NotifyCode = CBN_SELENDCANCEL) or (Message.NotifyCode = CBN_SELENDOK) or
+     (Message.NotifyCode = CBN_CLOSEUP) or (Message.NotifyCode = CBN_DROPDOWN) or
+     (Message.NotifyCode = CBN_SELCHANGE)  then
+  begin
+    if (Message.NotifyCode = CBN_DROPDOWN) or (Message.NotifyCode = CBN_SELCHANGE) then
+      FTempItemIndex := TComboBox(Control).ItemIndex;
+  end;
+  inherited;
+end;
+
+procedure TComboBoxStyleHookFix.DrawItem(Canvas: TCanvas; Index: Integer;
+      const R: TRect; Selected: Boolean);
+begin
+  if _DroppedDown then
+    inherited DrawItem(Canvas, FTempItemIndex, R, Selected)
+  else
+    inherited;
+end;
+
+function TComboBoxStyleHookHelper._getDroppedDown: Boolean;
+begin
+  Result := Self.DroppedDown;
+end;
+{$IFEND}
 
 end.

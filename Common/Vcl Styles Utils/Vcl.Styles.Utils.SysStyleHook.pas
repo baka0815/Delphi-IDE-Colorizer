@@ -2,7 +2,7 @@
 //
 // Unit Vcl.Styles.SysStyleHook
 // unit for the VCL Styles Utils
-// http://code.google.com/p/vcl-styles-utils/
+// https://github.com/RRUZ/vcl-styles-utils/
 //
 // The contents of this file are subject to the Mozilla Public License Version 1.1 (the "License");
 // you may not use this file except in compliance with the License. You may obtain a copy of the
@@ -15,7 +15,7 @@
 // The Original Code is uSysStyleHook.pas.
 //
 // Portions created by Mahdi Safsafi [SMP3]   e-mail SMP@LIVE.FR
-// Portions created by Rodrigo Ruz V. are Copyright (C) 2013-2014 Rodrigo Ruz V.
+// Portions created by Rodrigo Ruz V. are Copyright (C) 2013-2015 Rodrigo Ruz V.
 // All Rights Reserved.
 //
 // **************************************************************************************************
@@ -281,6 +281,7 @@ end;
 
 constructor TSysControl.Create(AHandle: THandle);
 begin
+  inherited Create;
   FFont := nil;
   FParent := nil;
   Handle := AHandle;
@@ -636,16 +637,16 @@ function TSysStyleHook.DrawText(DC: HDC; Details: TThemedElementDetails; S: Stri
 var
   DrawFlags: Cardinal;
   SaveIndex: Integer;
-  sColor: TColor;
+  LColor: TColor;
 begin
   SaveIndex := SaveDC(DC);
   try
     SetBkMode(DC, TRANSPARENT);
-    if not StyleServices.GetElementColor(Details, ecTextColor, sColor) then
-      sColor := FontColor;
+    if not StyleServices.GetElementColor(Details, ecTextColor, LColor) then
+      LColor := FontColor;
     if not OverrideFont then
-      sColor := FontColor;
-    SetTextColor(DC, sColor);
+      LColor := FontColor;
+    SetTextColor(DC, ColorToRGB(LColor));
     DrawFlags := TTextFormatFlags(Flags);
     Result := Winapi.Windows.DrawText(DC, S, -1, R, DrawFlags);
   finally
@@ -659,16 +660,16 @@ var
   DrawFlags: Cardinal;
   DrawParams: TDrawTextParams;
   SaveIndex: Integer;
-  sColor: TColor;
+  LColor: TColor;
 begin
   SaveIndex := SaveDC(DC);
   try
     SetBkMode(DC, TRANSPARENT);
-    if not StyleServices.GetElementColor(Details, ecTextColor, sColor) then
-      sColor := FontColor;
+    if not StyleServices.GetElementColor(Details, ecTextColor, LColor) then
+      LColor := FontColor;
     if not OverrideFont then
-      sColor := FontColor;
-    SetTextColor(DC, sColor);
+      LColor := FontColor;
+    SetTextColor(DC, ColorToRGB(LColor));
     DrawRect := R;
     DrawFlags := DT_END_ELLIPSIS or DT_WORDBREAK or DT_EDITCONTROL or DT_CENTER;
     if DrawFlags <> 0 then
@@ -987,18 +988,18 @@ function TSysStyleHook.CheckIfParentBkGndPainted: Boolean;
 var
   Test: Integer;
   PTest: PInteger;
-  ParentHandle: HWND;
+  LParentHandle: HWND;
 begin
   //Exit(True);
   Test := $93;
   PTest := @Test;
   Result := False;
-  ParentHandle := GetParent(Handle);
-  if ParentHandle > 0 then
+  LParentHandle := GetParent(Handle);
+  if LParentHandle > 0 then
   begin
-    if not IsControlHooked(ParentHandle) then
+    if not IsControlHooked(LParentHandle) then
       Exit(False);
-    SendMessage(ParentHandle, WM_ERASEBKGND, 0, lParam(PTest));
+    SendMessage(LParentHandle, WM_ERASEBKGND, 0, lParam(PTest));
     Result := (PTest^ = $11);
   end;
 end;

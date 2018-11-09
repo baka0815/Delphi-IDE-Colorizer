@@ -2,7 +2,7 @@
 //
 // Unit Vcl.Styles.Utils.ScreenTips
 // unit for the VCL Styles Utils
-// http://code.google.com/p/vcl-styles-utils/
+// https://github.com/RRUZ/vcl-styles-utils/
 //
 // The contents of this file are subject to the Mozilla Public License Version 1.1 (the "License");
 // you may not use this file except in compliance with the License. You may obtain a copy of the
@@ -14,7 +14,7 @@
 //
 //
 // Portions created by Mahdi Safsafi [SMP3]   e-mail SMP@LIVE.FR
-// Portions created by Rodrigo Ruz V. are Copyright (C) 2013-2014 Rodrigo Ruz V.
+// Portions created by Rodrigo Ruz V. are Copyright (C) 2013-2017 Rodrigo Ruz V.
 // All Rights Reserved.
 //
 // **************************************************************************************************
@@ -53,6 +53,10 @@ type
 implementation
 
 uses
+  Winapi.CommCtrl,
+  {$IF CompilerVersion >= 30.0}  //DX Seattle and UP.
+  Vcl.SysStyles,
+  {$IFEND}
   Vcl.Styles.Utils.SysControls;
 
 { TSysTooltipsStyleHook }
@@ -88,14 +92,14 @@ begin
   { Draw Tooltips Face }
   GradientFillCanvas(Canvas, GradientStartColor, GradientEndColor, SysControl.ClientRect, gdVertical);
   { Draw Tooltips Border }
-  Brush := CreateSolidBrush(BkColor);
+  Brush := CreateSolidBrush(ColorToRGB(BkColor));
   FrameRect(DC, SysControl.ClientRect, Brush);
   DeleteObject(Brush);
   { Use default font for Tooltips text }
   SelectObject(DC, Screen.HintFont.Handle);
   { Draw Tooltips Text }
   SetBkMode(DC, TRANSPARENT);
-  SetTextColor(DC, TextColor);
+  SetTextColor(DC, ColorToRGB(TextColor));
   AText := PChar(SysControl.Text);
   Winapi.Windows.DrawText(DC, AText, -1, TextRect, DT_LEFT);
 end;
@@ -103,7 +107,10 @@ end;
 procedure TSysTooltipsStyleHook.WMPaint(var Message: TMessage);
 begin
   CallDefaultProc(Message);
-  inherited;
+  if (GetWindowLong(Handle, GWL_STYLE) and TTS_BALLOON) = TTS_BALLOON then
+    Handled := True
+  else
+    inherited;
 end;
 
 procedure TSysTooltipsStyleHook.WndProc(var Message: TMessage);
@@ -140,11 +147,15 @@ end;
 
 initialization
 
+{$IF CompilerVersion >= 30.0}  //DX Seattle and UP.
+  TCustomStyleEngine.UnRegisterSysStyleHook('tooltips_class32', Vcl.SysStyles.TSysTooltipsStyleHook);
+{$IFEND}
+
+
 if StyleServices.Available then
-  TSysStyleManager.RegisterSysStyleHook('tooltips_class32', TSysTooltipsStyleHook);
+  TSysStyleManager.RegisterSysStyleHook(TOOLTIPS_CLASS, TSysTooltipsStyleHook);
 
 finalization
-
-TSysStyleManager.UnRegisterSysStyleHook('tooltips_class32', TSysTooltipsStyleHook);
+  TSysStyleManager.UnRegisterSysStyleHook(TOOLTIPS_CLASS, TSysTooltipsStyleHook);
 
 end.
