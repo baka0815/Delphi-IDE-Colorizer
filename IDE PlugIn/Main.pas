@@ -188,7 +188,6 @@ uses
  Colorizer.Hooks.ThemedActnCtrls,
  Colorizer.Vcl.Styles,
  {$ENDIF}
- Vcl.Styles.Utils.FlatMenus,
  uMisc;
 
 
@@ -264,8 +263,6 @@ begin
   AddLog2('InstallAllHooks', 'InstallThemedActnCtrlsHooks');
   InstallThemedActnCtrlsHooks();
   {$ENDIF}
-  AddLog2('InstallAllHooks', 'RegisterFlatMenusHooks');
-  RegisterFlatMenusHooks();
   AddLog2('InstallAllHooks', 'Done');
 end;
 
@@ -289,7 +286,6 @@ begin
   RemoveThemedActnCtrlsHooks();
   AddLog2('RemoveAllHooks', 'RemoveThemedActnCtrlsHooks');
   {$ENDIF}
-  UnregisterFlatMenusHooks();
   AddLog2('RemoveAllHooks', 'Done');
 end;
 
